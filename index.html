@@ -1,0 +1,242 @@
+<html>
+  <head>
+    <title>TivaWare Glyph Designer</title>
+    <script>
+      window.onload = (function() {
+        const SIZE = 30;
+        let GLYPH = getNewGlyph();
+        let MOUSE_X = -1, MOUSE_Y = -1;
+
+        function getNewGlyph()
+        {
+          return [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+        }
+
+        /**
+         * @param {string} str
+         * @param {number} len
+         * @param {string} char
+         * @returns {string}
+         */
+        function leftPad(str, len, char)
+        {
+          let newstr = str.slice();
+          while (newstr.length < len)
+          {
+            newstr = char + newstr;
+          }
+          return newstr;
+        }
+
+        /**
+         * @param {number[]} glyph
+         * @param {number} x
+         * @param {number} y
+         */
+        function toggleGlyphCell(glyph, x, y)
+        {
+          /** @type {number[]} */
+          const g = glyph.slice();
+
+          // if the bit is set
+          if (g[x] >> y & 0x01)
+          {
+            // unset the bit
+            g[x] = 0xFF - (g[x] ^ (0xFF - (0x01 << y)));
+          }
+          else
+          {
+            // set the bit
+            g[x] = g[x] | 0x01 << y;
+          }
+
+          return g;
+        }
+
+        function glyphToString(glyph)
+        {
+          return glyph.map(function(val){
+            return "0x" + leftPad(val.toString(16), 2, "0");
+          }).join(",") + ",";
+        }
+
+        function stringToGlyph(string)
+        {
+          const glyph = string
+            .trim()
+            .split(",")
+            .map(function(s) {
+              return s.trim();
+            })
+            .map(function(s) {
+              return Number(s);
+            }).slice(0, 8);
+
+          if (glyph.length < 8)
+          {
+            throw new Error("Too few values");
+          }
+
+          if (glyph.length > 8)
+          {
+            throw new Error("Too many values");
+          }
+
+          return glyph;
+        }
+
+        /**
+         * @param {CanvasRenderingContext2D} ctx
+         * @param {number[]} glyph
+         */
+        function render(ctx)
+        {
+          // draw background
+          ctx.fillStyle = "black";
+          ctx.fillRect(0, 0, SIZE * 8, SIZE * 8);
+
+          // draw glyph
+          for (let j = 0; j < 8; j++)
+          {
+            for (let i = 0; i < 8; i++)
+            {
+              const c = GLYPH[i];
+              if (MOUSE_X === i && MOUSE_Y === j)
+              {
+                ctx.fillStyle = "orange";
+                ctx.fillRect(i * SIZE, j * SIZE, SIZE, SIZE);
+
+              }
+              else if (c & 1 << j)
+              {
+                ctx.fillStyle = "white";
+                ctx.fillRect(i * SIZE, j * SIZE, SIZE, SIZE);
+              }
+            }
+          }
+
+          window.requestAnimationFrame(function() { render(ctx); });
+        }
+
+        function updateGlyphText(glyph)
+        {
+          document.getElementById("glyph-text").innerText = glyphToString(glyph);
+        }
+
+        function askForGlyphData(defaultGlyphString)
+        {
+          const glyphString = prompt("Please enter the glyph data:", defaultGlyphString);
+          try {
+            const glyphData = stringToGlyph(glyphString);
+            GLYPH = glyphData;
+          } catch (err) {
+            console.error(err);
+            alert("Could not import glyph data. Data may be invalid.");
+          }
+        }
+
+        function init()
+        {
+          /** @type {HTMLElement} */
+          const canvas = document.getElementById("canvas");
+
+          canvas.onmouseout = function() {
+            MOUSE_X = -1;
+            MOUSE_Y = -1;
+          };
+
+          canvas.onmousemove = function(event) {
+            MOUSE_X = Math.floor(event.offsetX / SIZE);
+            MOUSE_Y = Math.floor(event.offsetY / SIZE);
+          };
+
+          canvas.onmousedown = function() {
+            GLYPH = toggleGlyphCell(GLYPH, MOUSE_X, MOUSE_Y);
+            updateGlyphText(GLYPH);
+          };
+
+          document.getElementById("btnClear").onclick = function() {
+            GLYPH = getNewGlyph();
+          }
+
+          document.getElementById("btnImport").onclick = function() {
+
+            navigator.clipboard.readText()
+              .then(askForGlyphData)
+              .catch(function(){
+                askForGlyphData("");
+              });
+          }
+
+          document.getElementById("btnExport").onclick = function() {
+            navigator.clipboard.writeText(glyphToString(GLYPH))
+              .then(function() {
+                alert("Glyph data has been copied to the clipboard!");
+              })
+              .catch(function() {
+                alert("Glyph data could not be copied to the clipboard!");
+              });
+          }
+
+          /** @type{CanvasRenderingContext2D} */
+          const ctx = canvas.getContext("2d");
+
+          updateGlyphText(GLYPH);
+
+          window.requestAnimationFrame(function() { render(ctx); });
+        }
+
+        init();
+      });
+    </script>
+    <style>
+      .pre {
+        font-family: 'Courier New', Courier, monospace;
+      }
+
+      .highlight {
+        background-color: yellow;
+      }
+
+      #canvas {
+        border: solid 1px black;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>OrbitOLED Glyph Designer</h1>
+    <h4><em>Written by Jesse Sheehan</em></h4>
+
+    <p>
+      Create your own characters for the Orbit OLED screen!
+    </p>
+    <div>
+      <canvas id="canvas" width="240" height="240"></canvas>
+      <br />
+      <button id="btnClear">Clear Glyph</button>
+    </div>
+    <br />
+    <div>
+      
+      <h3>Glyph Data:</h3>
+      <p>
+        <span class="pre highlight" id="glyph-text"></span>
+        <br />
+        <br />
+        <button id="btnImport">Import Data</button>
+        <button id="btnExport">Export Data</button>
+      </p>
+
+      <div class="instructions">
+        <h3>Instructions:</h3>
+        <ol>
+          <li>Design your glyph by left-clicking on the black square above.</li>
+          <li>Copy the highlighted text above or click on the <em>Export Data</em> button.</li>
+          <li>Open the <span class="pre">ChrFont0.c</span> file inside the <span class="pre">OrbitOLED/lib_OrbitOled</span> directory.</li>
+          <li>Decide on a character you don't need and replace the existing glyph data with the glyph data you copied. You will need to note the index of this glyph.</li>
+          <li>Simply call <span class="pre">OLEDStringDraw</span> function from within your program. You will need to make sure that a character with the same character code as the glyph index is in the string.</li>
+        </ol>
+      </div>
+    </div>
+  </body>
+</html>
