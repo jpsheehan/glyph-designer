@@ -129,6 +129,7 @@
           try {
             const glyphData = stringToGlyph(glyphString);
             GLYPH = glyphData;
+            updateGlyphText(GLYPH);
           } catch (err) {
             console.error(err);
             alert("Could not import glyph data. Data may be invalid.");
@@ -157,10 +158,10 @@
 
           document.getElementById("btnClear").onclick = function() {
             GLYPH = getNewGlyph();
+            updateGlyphText(GLYPH);
           }
 
           document.getElementById("btnImport").onclick = function() {
-
             navigator.clipboard.readText()
               .then(askForGlyphData)
               .catch(function(){
